@@ -184,35 +184,46 @@ class MyClient extends Thread {
 		PrintWriter out = null;
 		String t = "";
 		
-		if (port > 0) { // Listening to the socket
+		if (port > 0) { // Listening to the socket					
 			try {
+				sock.setSoTimeout(500); // 500ms timeout on reads
 				br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 				out = new PrintWriter(sock.getOutputStream(), true);
-				System.out.println("Connected on port " + port);
-				while (true) {	
-/* This looks like it's still blocking
+			} catch (Exception e) {
+			}
+			System.out.print("Connected on port " + port + "\nWhat's your name? ");
+			while (true) {
+				try {					
 					if (br.ready()) {
-						System.out.println(br.readLine());
+						t = br.readLine();
+						System.out.println(t);
+						t = "";
 					}
-					*/
+				} catch (Exception e) {
+					//System.out.println (e.toString());
+					// The TCP/IP read timeout is set to 500ms above, this is a stupid hack
+				}				
+
+				try {
 					synchronized (message) {
-						System.out.print(message);
+						if (message == null) {							
+							System.out.println("Exiting chat client.");
+							return;
+						}
 						if (message.compareTo("") > 0) {
-							System.out.println("Sending: " + message);
 							out.println(message);
 							out.flush();
 							message = "";
 						}
 					}
+				} catch (Exception e) {
+					//System.out.println("Exiting chat client.");
 				}
-			} catch (Exception e) {
-				System.out.println("Talk, print writer: " + e.toString());
-			}
-		} else {
+			}			
+		} else { // User input thread
 			br = new BufferedReader(new InputStreamReader(System.in));
 			while (true) {
 				try {
-					System.out.print(" Client:");
 					t = br.readLine();
 					synchronized (message) {
 						message = t;
