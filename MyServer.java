@@ -8,6 +8,9 @@ import java.net.Socket;
 import java.util.List;
 import java.util.ArrayList;
 
+/**
+* The main server class that listens for a connection
+*/
 public class MyServer {
 	private MyWrangler mw = new MyWrangler();  // One wrangler instance that gets passed to each listener thread
 	
@@ -21,7 +24,7 @@ public class MyServer {
 		System.out.println("Creating server socket on port " + portNumber);
 		try {
 			ServerSocket serverSocket = new ServerSocket(portNumber);
-			while (true) {				
+			while (true) { // Wait for a connection, then start a new thread when you get one
 				MyListener mySock = new MyListener(serverSocket.accept(), mw); // Pass the unique socket and the common wrangler
 				mySock.start();
 				System.out.println("Client connected.");
@@ -53,14 +56,15 @@ class MyWrangler extends Thread {
 		socks.remove(sock);
 	}
 	
+	// Main method needed to pass message to all the connected clients
 	public void message (String msg, MyListener talkingSock) {				
 		PrintWriter out = null;
 		for (MyListener sock : socks) {
 			try {
 				out = new PrintWriter(sock.sock.getOutputStream(), true);
 				out.println(msg);
-				if (out.checkError()) {
-					socks.remove(sock);
+				if (out.checkError()) { // Client isn't connected
+					socks.remove(sock); // Clean up the list
 					System.out.println("Client disconnected.");
 				}
 			} catch (Exception e) {
@@ -69,11 +73,17 @@ class MyWrangler extends Thread {
 				return;
 			}
 		}
+		// Just here for info, and to make sure the sock count matches what you think it should
 		System.out.println("Sending message through the wrangler, sock count: " + count());
 		out = null;
 	}
 }
 
+/*
+* When a new client connects, a MyListener is created by MyServer
+* This holds the socket reference and the wrangler with the list of other connected clients
+
+*/
 class MyListener extends Thread {
 	private String name = "";
 	public Socket sock = null;
@@ -85,6 +95,7 @@ class MyListener extends Thread {
 		this.mw = mw;
 	}
 	
+	// Close the socket
 	public void close() {
 		try {
 			if (sock != null) sock.close();
@@ -93,11 +104,13 @@ class MyListener extends Thread {
 		}
 	}
 	
+	// Set the name attached to the client
 	public void setHandle(String name) {
 		this.name = name;
 		message(name + " has joined the chat.");
 	}
 	
+	// The name attached to the client
 	public String getHandle() { 
 		return name; 
 	}
@@ -106,7 +119,7 @@ class MyListener extends Thread {
 		PrintWriter out = null;
 		BufferedReader br = null;
 		
-		try {
+		try { // First asks for a name connected to the client
 			mw.add(this); // Add to the sock collection in the wrangler so we can message back
 			out = new PrintWriter(sock.getOutputStream(), true);
 			out.print("What's your name? ");
@@ -114,23 +127,21 @@ class MyListener extends Thread {
 			br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 			setHandle(br.readLine());
 		} catch (Exception e) {
-			//System.out.println("MyListener.run 1: " + e.toString());
 			mw.remove(this);
 			System.out.println("Client disconnected.");
 			return;
 		}
 		
-		try {		
+		try {
 			String t = "";
-			while (true) {
-				//if (!sock.isConnected()) return;
+			while (true) { // Main loop waiting on client messages
 				t = br.readLine();
-				if (t == "" || t == null) return;
-				message(getHandle() + ": " + t);				
-				out.print("\n" + name + ":");
+				if (t == "" || t == null) {
+					message(name + " has left the chat.");
+					return;
+				} else message(getHandle() + ": " + t);				
 			}
 		} catch (Exception e) {
-			//System.out.println("MyListener.run 2: " + e.toString());
 			mw.remove(this);
 			System.out.println("Client disconnected.");
 			return;
@@ -142,6 +153,9 @@ class MyListener extends Thread {
 	}
 }
 
+/**
+* Just a generic client, not quite working yet
+*/
 class MyClient extends Thread {
 	private static Socket sock = null;
 	private int port = 0;
@@ -170,13 +184,13 @@ class MyClient extends Thread {
 		PrintWriter out = null;
 		String t = "";
 		
-		if (port > 0) {
+		if (port > 0) { // Listening to the socket
 			try {
 				br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 				out = new PrintWriter(sock.getOutputStream(), true);
 				System.out.println("Connected on port " + port);
 				while (true) {	
-/*
+/* This looks like it's still blocking
 					if (br.ready()) {
 						System.out.println(br.readLine());
 					}
