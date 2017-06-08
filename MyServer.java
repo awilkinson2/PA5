@@ -18,18 +18,16 @@ public class MyServer {
 	
 	private void run() {
 		final int portNumber = 1201;
-		//mw.start();
 		System.out.println("Creating server socket on port " + portNumber);
 		try {
 			ServerSocket serverSocket = new ServerSocket(portNumber);
-			while (true) {			
-				System.out.println("Waiting for connection");			
+			while (true) {				
 				MyListener mySock = new MyListener(serverSocket.accept(), mw); // Pass the unique socket and the common wrangler
 				mySock.start();
-				System.out.println("Looping to wait");
+				System.out.println("Client connected.");
 			}		
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			System.out.println("MyServer: " + e.toString());
 		}
 	}
 }
@@ -40,45 +38,32 @@ public class MyServer {
 * to all the other clients
 */
 class MyWrangler extends Thread {
-	private boolean debug = true;
 	private List<MyListener> socks = new ArrayList<MyListener>();
 	private boolean running = true;
 	
-	public void run () {
-		while (running) {
-			//ConcurrentLinkedQueue
-			//check the queue here
-			//System.out.println("Wrangler spinning.");
-		}
-		if (debug) System.out.println("Wrangler returning.");
-		return;
+	public int count () { // Total count of socks in the pile
+		return socks.size();
 	}
 	
-	public void add(MyListener sock) {
-		if (debug) System.out.println("Added another sock to the collection");
+	public void add(MyListener sock) { // Add another sock to the pile
 		socks.add(sock);
 	}
 	
 	public void message (String msg, MyListener talkingSock) {		
-		if (debug) System.out.println("Sending message through the wrangler, sock count: " + socks.size());
+		System.out.println("Sending message through the wrangler, sock count: " + count());
 		PrintWriter out = null;
 		for (MyListener sock : socks) {
 			if (talkingSock != sock && talkingSock.sock.isConnected()) {
 				try {
-					if (sock == null) {
-						//socks.remove(talkingSock);
+					out = new PrintWriter(sock.sock.getOutputStream(), true);
+					out.println(msg);
+					if (out.checkError()) {
 						socks.remove(sock);
-						if (debug) System.out.println("A sock is null.");
-						running = false;
-					} else {
-						if (debug) System.out.println("A sock is not null.");
-						out = new PrintWriter(sock.sock.getOutputStream(), true);
-						out.println(msg);
-						out.flush();
+						System.out.println("Client disconnected.");
 					}
 				} catch (Exception e) {
-					socks.remove(sock);
-					System.out.println(e.toString());
+					sock.close();
+					System.out.println("message: " + e.toString());
 					return;
 				}
 			}
@@ -99,6 +84,14 @@ class MyListener extends Thread {
 		this.mw = mw;
 	}
 	
+	public void close() {
+		try {
+			if (sock != null) sock.close();
+		} catch (Exception e) {
+			System.out.println("MyListener close: " + e.toString());
+		}
+	}
+	
 	public void setHandle(String name) {
 		this.name = name;
 		message(name + " has joined the chat.");
@@ -109,16 +102,24 @@ class MyListener extends Thread {
 	}
 	
 	public void run() {
+		PrintWriter out = null;
+		BufferedReader br = null;
+		
 		try {
 			if (debug) System.out.println("In run method");			
 			mw.add(this); // Add to the sock collection in the wrangler so we can message back
 			
-			PrintWriter out = new PrintWriter(sock.getOutputStream(), true);
-			out.print("What's you name? ");
+			out = new PrintWriter(sock.getOutputStream(), true);
+			out.print("What's your name? ");
 			out.flush();
-			BufferedReader br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+			br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 			setHandle(br.readLine());
-			
+		} catch (Exception e) {
+			System.out.println("MyListener.run 1: " + e.toString());
+			return;
+		}
+		
+		try {		
 			String t = "";
 			while (true) {
 				if (!sock.isConnected()) return;
@@ -127,13 +128,9 @@ class MyListener extends Thread {
 				if (!message(getHandle() + ": " + t)) return;
 				
 				out.print("\n" + name + ":");
-				out.flush();
 			}
-		//Would go great in a destructor...
-		//pw.close();
-		//sock.close();
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			System.out.println("MyListener.run 2: " + e.toString());
 			return;
 		}
 	}
@@ -158,7 +155,7 @@ class MyClient extends Thread {
 		try {
 			sock = new Socket("localhost", 1201);
 		} catch (Exception e) {
-			System.out.println(e.toString());
+			System.out.println("MyClient constructor: " + e.toString());
 			return;
 		}
 		this.sock = sock;
