@@ -49,31 +49,32 @@ class MyWrangler extends Thread {
 		socks.add(sock);
 	}
 	
-	public void message (String msg, MyListener talkingSock) {		
-		System.out.println("Sending message through the wrangler, sock count: " + count());
+	public void remove(MyListener sock) { // Clean up sock pile
+		socks.remove(sock);
+	}
+	
+	public void message (String msg, MyListener talkingSock) {				
 		PrintWriter out = null;
 		for (MyListener sock : socks) {
-			if (talkingSock != sock && talkingSock.sock.isConnected()) {
-				try {
-					out = new PrintWriter(sock.sock.getOutputStream(), true);
-					out.println(msg);
-					if (out.checkError()) {
-						socks.remove(sock);
-						System.out.println("Client disconnected.");
-					}
-				} catch (Exception e) {
-					sock.close();
-					System.out.println("message: " + e.toString());
-					return;
+			try {
+				out = new PrintWriter(sock.sock.getOutputStream(), true);
+				out.println(msg);
+				if (out.checkError()) {
+					socks.remove(sock);
+					System.out.println("Client disconnected.");
 				}
+			} catch (Exception e) {
+				sock.close();
+				System.out.println("message: " + e.toString());
+				return;
 			}
 		}
+		System.out.println("Sending message through the wrangler, sock count: " + count());
 		out = null;
 	}
 }
 
 class MyListener extends Thread {
-	private boolean debug = false;
 	private String name = "";
 	public Socket sock = null;
 	private MyWrangler mw = null;	
@@ -106,121 +107,106 @@ class MyListener extends Thread {
 		BufferedReader br = null;
 		
 		try {
-			if (debug) System.out.println("In run method");			
 			mw.add(this); // Add to the sock collection in the wrangler so we can message back
-			
 			out = new PrintWriter(sock.getOutputStream(), true);
 			out.print("What's your name? ");
 			out.flush();
 			br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
 			setHandle(br.readLine());
 		} catch (Exception e) {
-			System.out.println("MyListener.run 1: " + e.toString());
+			//System.out.println("MyListener.run 1: " + e.toString());
+			mw.remove(this);
+			System.out.println("Client disconnected.");
 			return;
 		}
 		
 		try {		
 			String t = "";
 			while (true) {
-				if (!sock.isConnected()) return;
+				//if (!sock.isConnected()) return;
 				t = br.readLine();
 				if (t == "" || t == null) return;
-				if (!message(getHandle() + ": " + t)) return;
-				
+				message(getHandle() + ": " + t);				
 				out.print("\n" + name + ":");
 			}
 		} catch (Exception e) {
-			System.out.println("MyListener.run 2: " + e.toString());
+			//System.out.println("MyListener.run 2: " + e.toString());
+			mw.remove(this);
+			System.out.println("Client disconnected.");
 			return;
 		}
 	}
 
-	public boolean message(String msg) {
-		if (mw != null && !sock.isClosed()) {
-			if (debug) System.out.println("Sending message from the listener");
-			mw.message(msg, this);
-			return true;
-		} else {
-			if (debug) System.out.println("listener message Sock: " + sock.isConnected() + " Wrangler: " + mw == null);
-			return false;
-		}
+	public void message(String msg) {
+		mw.message(msg, this);
 	}
 }
 
 class MyClient extends Thread {
 	private static Socket sock = null;
-	private boolean mode = false;
+	private int port = 0;
+	protected static volatile String message = "";
 	
-	MyClient (Socket sock, boolean mode) {
-		try {
-			sock = new Socket("localhost", 1201);
+	MyClient (int port) {
+		if (port == 0) return;		
+		try { // Else it's the thread holding the socket
+			this.port = port;
+			sock = new Socket("localhost", port);
 		} catch (Exception e) {
 			System.out.println("MyClient constructor: " + e.toString());
 			return;
 		}
-		this.sock = sock;
-		this.mode = mode;
 	}
 	
 	public static void main(String argv[]) throws Exception {
-		MyClient listener = new MyClient(sock, true);
-		MyClient talker = new MyClient(sock, false);
-		
-		listener.start();
-		talker.start();
+		MyClient listener = new MyClient(1201);
+		MyClient talker = new MyClient(0);
+		listener.start(); // Start the listening thread
+		talker.start(); // This will be the input thread
 	}
 	
 	public void run() {
-		if (mode) {
-			System.out.println("Starting listener.");
-			Listen();
-		} else {
-			System.out.println("Starting talker.");
-			Talk();
-		}
-	}
-	
-	private void Talk() {
-		String t = "";
-		PrintWriter out = null;
-		try {
-			out = new PrintWriter(sock.getOutputStream(), true);
-		} catch (Exception e) {
-			System.out.println("Talk, print writer: " + e.toString());
-			return;
-		}
-		
-		if (out == null) return;
-		
-		BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-		while (true) {
-			try {
-				t = br.readLine();
-			} catch (Exception e) {
-				System.out.println("Talk, buffered reader: " + e.toString());
-				return;
-			}
-			if (t == "" || t == null) return;
-			out.print(t);
-			out.flush();
-		}
-	}
-	
-	private void Listen() {
 		BufferedReader br = null;
+		PrintWriter out = null;
 		String t = "";
 		
-		while(true) {
+		if (port > 0) {
 			try {
-				br = new BufferedReader(new InputStreamReader(System.in));
-				t = br.readLine();
+				br = new BufferedReader(new InputStreamReader(sock.getInputStream()));
+				out = new PrintWriter(sock.getOutputStream(), true);
+				System.out.println("Connected on port " + port);
+				while (true) {	
+/*
+					if (br.ready()) {
+						System.out.println(br.readLine());
+					}
+					*/
+					synchronized (message) {
+						System.out.print(message);
+						if (message.compareTo("") > 0) {
+							System.out.println("Sending: " + message);
+							out.println(message);
+							out.flush();
+							message = "";
+						}
+					}
+				}
 			} catch (Exception e) {
-				System.out.println("Listen readline: " + e.toString());
-				return;
+				System.out.println("Talk, print writer: " + e.toString());
 			}
-			
-			if (t == "" || t == null) return;
-			System.out.print(t);
+		} else {
+			br = new BufferedReader(new InputStreamReader(System.in));
+			while (true) {
+				try {
+					System.out.print(" Client:");
+					t = br.readLine();
+					synchronized (message) {
+						message = t;
+					}
+				} catch (Exception e) {
+					System.out.println("Talk, buffered reader: " + e.toString());
+				}
+			}
 		}
 	}
 }
