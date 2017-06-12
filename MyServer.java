@@ -45,15 +45,21 @@ class MyWrangler extends Thread {
 	private boolean running = true;
 	
 	public int count () { // Total count of socks in the pile
-		return socks.size();
+		synchronized (socks) {
+			return socks.size();
+		}
 	}
 	
 	public void add(MyListener sock) { // Add another sock to the pile
-		socks.add(sock);
+		synchronized (socks) {
+			socks.add(sock);
+		}
 	}
 	
 	public void remove(MyListener sock) { // Clean up sock pile
-		socks.remove(sock);
+		synchronized (socks) {
+			socks.remove(sock);
+		}
 	}
 	
 	// Main method needed to pass message to all the connected clients
@@ -61,7 +67,7 @@ class MyWrangler extends Thread {
 		PrintWriter out = null;
 		for (MyListener sock : socks) {
 			try {
-				out = new PrintWriter(sock.sock.getOutputStream(), true);
+				out = new PrintWriter(sock.sock.getOutputStream(), true);				
 				out.println(msg);
 				if (out.checkError()) { // Client isn't connected
 					socks.remove(sock); // Clean up the list
@@ -196,6 +202,7 @@ class MyClient extends Thread {
 				try {					
 					if (br.ready()) {
 						t = br.readLine();
+						t.replaceAll("[^a-zA-Z0-9]","");
 						System.out.println(t);
 						t = "";
 					}
@@ -210,7 +217,7 @@ class MyClient extends Thread {
 							System.out.println("Exiting chat client.");
 							return;
 						}
-						if (message.compareTo("") > 0) {
+						if (message.compareTo("") > 0) {							
 							out.println(message);
 							out.flush();
 							message = "";
