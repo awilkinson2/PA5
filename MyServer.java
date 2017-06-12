@@ -88,7 +88,6 @@ class MyWrangler extends Thread {
 /*
 * When a new client connects, a MyListener is created by MyServer
 * This holds the socket reference and the wrangler with the list of other connected clients
-
 */
 class MyListener extends Thread {
 	private String name = "";
