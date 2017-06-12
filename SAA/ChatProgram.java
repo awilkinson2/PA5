@@ -91,13 +91,10 @@ class ServerMain extends Thread{
 			System.out.println("ServerMain: " + e.toString());
 		}
 
-
 		mw.ShutDown();
 	}
 
 }
-
-
 
 /**
 * Didn't know what to call it, so this class "wrangles" all the socket clients,
@@ -110,18 +107,24 @@ class MyWrangler extends Thread {
 	public boolean runSilent = false;
 
 	public int count () { // Total count of socks in the pile
-		return socks.size();
+		synchronized (socks) {
+			return socks.size();
+		}
 	}
 
 	public void add(MyListener lsock) { // Add another sock to the pile
-		socks.add(lsock);
+		synchronized (socks) {
+			socks.add(lsock);
+		}
 	}
 
 	public void remove(MyListener lsock) { // Clean up sock pile
-		socks.remove(lsock);
+		synchronized (socks) {
+			socks.remove(lsock);
+		}
 	}
 
-//kill everything
+	//kill everything
 	public void ShutDown(){
 		running = false;
 		for (MyListener lsock : socks){
@@ -168,12 +171,7 @@ class MyWrangler extends Thread {
 
 		return chatList;
 	}
-
 }
-
-
-
-
 
 
 /*
