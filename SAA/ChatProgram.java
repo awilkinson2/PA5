@@ -365,7 +365,7 @@ class ClientMain extends Thread {
 			}
 		}
 		
-		ClientMain listener = new ClientMain("localhost", 1201);
+		ClientMain listener = new ClientMain(host, 1201);
 		ClientMain talker = new ClientMain("", 0);
 
 		listener.start(); // Start the listening thread
