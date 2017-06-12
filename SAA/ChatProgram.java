@@ -23,12 +23,12 @@ public class ChatProgram{
 	public static chatStatus status = chatStatus.starting;
 
 	public static void main(String argv[]) throws Exception {
-		ClientMain listener = new ClientMain(1201);
-		ClientMain talker = new ClientMain(0);
+		ClientMain listener = new ClientMain("localhost", 1201);
+		ClientMain talker = new ClientMain("", 0);
 
 		if (status == chatStatus.hosting){
 				ServerMain.InitServer();
-				listener = new ClientMain(1201);
+				listener = new ClientMain("localhost", 1201);
 		}
 
 		listener.start(); // Start the listening thread
@@ -340,11 +340,11 @@ class ClientMain extends Thread {
 	protected static volatile String message = "";
 	private boolean running = true;
 
-	ClientMain (int port) {
+	ClientMain (String host, int port) {
 		if (port == 0) return;
 		try { // Else it's the thread holding the socket
 			this.port = port;
-			sock = new Socket("localhost", port);
+			sock = new Socket(host, port);
 		} catch (Exception e)
 		{
 			//System.out.println("ClientMain constructor: " + e.toString());
@@ -356,8 +356,17 @@ class ClientMain extends Thread {
 
 	//main program if run independently
 	public static void main(String argv[]) throws Exception {
-		ClientMain listener = new ClientMain(1201);
-		ClientMain talker = new ClientMain(0);
+		String host = "localhost";
+		if (argv.length > 0) {
+			try {
+				host = argv[0];
+			} catch (Exception e) {
+				host = "localhost";
+			}
+		}
+		
+		ClientMain listener = new ClientMain("localhost", 1201);
+		ClientMain talker = new ClientMain("", 0);
 
 		listener.start(); // Start the listening thread
 		talker.start(); // This will be the input thread
